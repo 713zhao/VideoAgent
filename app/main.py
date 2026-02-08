@@ -5,7 +5,7 @@ from pathlib import Path
 from datetime import datetime
 
 from .config import load_config
-from .multi_source_fetch import fetch_all_sources, fetch_comments_for_topic, choose_top3_overall
+from .multi_source_fetch import fetch_all_sources, fetch_comments_for_topic, choose_top3_overall, fetch_article_content
 from .summarize import summarize
 from .tts import synthesize
 from .captions import write_srt
@@ -65,6 +65,22 @@ def run_once(cfg_path: str) -> Path:
     topic.comments = comments
     print(f"     ✓ Fetched {len(comments)} comments")
 
+  # Fetch full article content for all selected topics
+  print(f"\n" + "="*60)
+  print(f"📄 FETCHING FULL ARTICLE CONTENT FOR ALL {len(all_selected_topics)} TOPICS")
+  print("="*60)
+  user_agent = sources_dict.get('user_agent', 'Mozilla/5.0')
+  timeout = sources_dict.get('timeout_s', 15)
+  
+  for topic in all_selected_topics:
+    print(f"\n  📥 Fetching content for: {topic.title[:60]}...")
+    content = fetch_article_content(topic.url, user_agent, timeout)
+    topic.content = content
+    if content:
+      print(f"     ✓ Fetched {len(content)} characters of content")
+    else:
+      print(f"     ⚠️  No content extracted (will use title and comments)")
+
   topics_json = day_dir / "topics.json"
   topics_json.write_text(
     json.dumps([{
@@ -75,7 +91,8 @@ def run_once(cfg_path: str) -> Path:
       'comments_count': t.comments_count,
       'author': t.author,
       'excerpt': t.excerpt,
-      'comments': t.comments
+      'comments': t.comments,
+      'content': t.content
     } for t in all_selected_topics], ensure_ascii=False, indent=2),
     encoding="utf-8"
   )

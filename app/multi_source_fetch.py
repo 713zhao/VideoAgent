@@ -24,6 +24,7 @@ class Topic:
     comments_count: int = 0
     author: str = ""
     comments: List[Dict[str, str]] = None
+    content: str = ""  # Full article content
     
     def __post_init__(self):
         if self.comments is None:
@@ -317,6 +318,61 @@ class TwitterFetcher:
         except Exception as e:
             print(f"    ⚠️ Error fetching Twitter: {e}")
             return []
+
+def fetch_article_content(url: str, user_agent: str, timeout: int = 15) -> str:
+    """
+    Fetch full article content from a URL.
+    Extracts main text content from HTML pages.
+    """
+    try:
+        session = requests.Session()
+        session.headers.update({'User-Agent': user_agent})
+        response = session.get(url, timeout=timeout, verify=False, allow_redirects=True)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Remove script and style elements
+        for script in soup(["script", "style", "nav", "header", "footer", "aside"]):
+            script.decompose()
+        
+        # Try to find main content area
+        # Common article containers
+        main_content = None
+        selectors = [
+            'article', 
+            '[role="main"]',
+            '.post-content',
+            '.article-content',
+            '.entry-content',
+            '.content',
+            'main',
+            '#content'
+        ]
+        
+        for selector in selectors:
+            main_content = soup.select_one(selector)
+            if main_content:
+                break
+        
+        # If no specific container found, use body
+        if not main_content:
+            main_content = soup.find('body')
+        
+        if main_content:
+            # Extract all paragraphs
+            paragraphs = main_content.find_all('p')
+            text_parts = [p.get_text().strip() for p in paragraphs if p.get_text().strip()]
+            full_text = '\n\n'.join(text_parts)
+            
+            # Limit to reasonable length (first 5000 characters)
+            return full_text[:5000] if full_text else ""
+        
+        return ""
+        
+    except Exception as e:
+        print(f"    ⚠️ Could not fetch content from {url[:50]}...: {e}")
+        return ""
 
 def fetch_all_sources(sources_cfg: Dict[str, Any]) -> Dict[str, List[Topic]]:
     """

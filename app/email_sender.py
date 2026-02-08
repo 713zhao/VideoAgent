@@ -174,6 +174,22 @@ def build_html_email(topics: List[Dict], summary: Dict, include_topics: bool, in
         <p><strong>Date:</strong> {datetime.now().strftime('%B %d, %Y')}</p>
 """
     
+    # Show AI Summary FIRST
+    if include_summary and summary:
+        narration = summary.get('narration', '')
+        if narration:
+            html += f"""
+        <h2>📝 AI Summary</h2>
+        <div class="summary">{narration}</div>
+"""
+        
+        hashtags = summary.get('hashtags', [])
+        if hashtags:
+            html += f"""
+        <p><strong>Hashtags:</strong> {' '.join(hashtags)}</p>
+"""
+    
+    # Then show Topics List
     if include_topics and topics:
         html += f"""
         <h2>📊 Top {len(topics)} Topics</h2>
@@ -206,20 +222,6 @@ def build_html_email(topics: List[Dict], summary: Dict, include_topics: bool, in
         </div>
 """
     
-    if include_summary and summary:
-        narration = summary.get('narration', '')
-        if narration:
-            html += f"""
-        <h2>📝 AI Summary</h2>
-        <div class="summary">{narration}</div>
-"""
-        
-        hashtags = summary.get('hashtags', [])
-        if hashtags:
-            html += f"""
-        <p><strong>Hashtags:</strong> {' '.join(hashtags)}</p>
-"""
-    
     html += """
         <div class="footer">
             <p>This email was generated automatically by AI Daily Bot</p>
@@ -241,6 +243,19 @@ Date: {datetime.now().strftime('%B %d, %Y')}
 
 """
     
+    # Show AI Summary FIRST
+    if include_summary and summary:
+        narration = summary.get('narration', '')
+        if narration:
+            text += "AI SUMMARY\n"
+            text += "="*60 + "\n"
+            text += narration + "\n\n"
+        
+        hashtags = summary.get('hashtags', [])
+        if hashtags:
+            text += f"Hashtags: {' '.join(hashtags)}\n\n"
+    
+    # Then show Topics List
     if include_topics and topics:
         text += f"TOP {len(topics)} TOPICS\n"
         text += "="*60 + "\n\n"
@@ -260,17 +275,6 @@ Date: {datetime.now().strftime('%B %d, %Y')}
                 text += f"Excerpt: {excerpt[:150]}...\n"
             text += f"URL: {url}\n"
             text += "-"*60 + "\n\n"
-    
-    if include_summary and summary:
-        narration = summary.get('narration', '')
-        if narration:
-            text += "\nAI SUMMARY\n"
-            text += "="*60 + "\n"
-            text += narration + "\n\n"
-        
-        hashtags = summary.get('hashtags', [])
-        if hashtags:
-            text += f"Hashtags: {' '.join(hashtags)}\n"
     
     text += "\n" + "="*60 + "\n"
     text += "This email was generated automatically by AI Daily Bot\n"

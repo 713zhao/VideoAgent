@@ -68,7 +68,8 @@ def render_video(cfg: VideoCfg, voice_path: Path, srt_path: Path, out_dir: Path,
 
   force_style = ",".join(style_parts)
   srt = Path(srt_path).resolve()
-  vf = f"subtitles='{str(srt).replace('\\', '/')}':force_style='{force_style}'"
+  srt_path_str = str(srt).replace('\\', '/')
+  vf = f"subtitles='{srt_path_str}':force_style='{force_style}'"
 
   # Build audio filter if music is present
   audio_filters = []
