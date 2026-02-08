@@ -96,6 +96,7 @@ class CaptionsStyle(BaseModel):
   margin_v: int = 160
 
 class VideoCfg(BaseModel):
+  enabled: bool = True
   width: int = 1080
   height: int = 1920
   fps: int = 30
@@ -128,6 +129,13 @@ class EmailCfg(BaseModel):
   include_summary: bool = True
   include_video_link: bool = False
 
+class SchedulerCfg(BaseModel):
+  enabled: bool = False
+  mode: Literal["daily", "hourly", "interval"] = "daily"
+  time: str = "08:00"  # HH:MM format for daily mode
+  interval_minutes: int = 60  # For interval mode
+  run_on_start: bool = False
+
 class AppCfg(BaseModel):
   sources: SourcesCfg = Field(default_factory=SourcesCfg)
   summarizer: SummarizerCfg = Field(default_factory=SummarizerCfg)
@@ -135,6 +143,7 @@ class AppCfg(BaseModel):
   video: VideoCfg = Field(default_factory=VideoCfg)
   output: OutputCfg = Field(default_factory=OutputCfg)
   email: EmailCfg = Field(default_factory=EmailCfg)
+  scheduler: SchedulerCfg = Field(default_factory=SchedulerCfg)
 
 def load_config(path: str) -> AppCfg:
   with open(path, "r", encoding="utf-8") as f:

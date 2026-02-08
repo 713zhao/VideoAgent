@@ -147,37 +147,46 @@ def run_once(cfg_path: str) -> Path:
   else:
     print("\n⚠️ Email notifications disabled in config")
 
-  # 3) TTS
-  print("\n" + "="*60)
-  print("🎤 GENERATING TEXT-TO-SPEECH")
-  print("="*60)
-  print(f"Using TTS backend: {cfg.tts.backend}")
-  voice_path = synthesize(cfg.tts, bundle.get("narration", ""), out_dir=day_dir)
-  print(f"✓ Voice generated: {voice_path.name}")
+  # Video generation (can be disabled)
+  final_mp4 = None
+  if cfg.video.enabled:
+    # 3) TTS
+    print("\n" + "="*60)
+    print("🎤 GENERATING TEXT-TO-SPEECH")
+    print("="*60)
+    print(f"Using TTS backend: {cfg.tts.backend}")
+    voice_path = synthesize(cfg.tts, bundle.get("narration", ""), out_dir=day_dir)
+    print(f"✓ Voice generated: {voice_path.name}")
 
-  # 4) Captions
-  print("\n" + "="*60)
-  print("📄 WRITING SUBTITLES")
-  print("="*60)
-  srt_path = write_srt(bundle.get("captions", []), out_dir=day_dir)
-  print(f"✓ Captions written: {srt_path.name}")
+    # 4) Captions
+    print("\n" + "="*60)
+    print("📄 WRITING SUBTITLES")
+    print("="*60)
+    srt_path = write_srt(bundle.get("captions", []), out_dir=day_dir)
+    print(f"✓ Captions written: {srt_path.name}")
 
-  # 5) Render video
-  print("\n" + "="*60)
-  print("🎬 RENDERING VIDEO")
-  print("="*60)
-  print(f"Resolution: {cfg.video.width}x{cfg.video.height} @ {cfg.video.fps}fps")
-  print(f"Background: {cfg.video.background_color}")
-  final_mp4 = render_video(cfg.video, voice_path=voice_path, srt_path=srt_path, out_dir=day_dir)
-  print(f"✓ Video rendered: {final_mp4.name}")
+    # 5) Render video
+    print("\n" + "="*60)
+    print("🎬 RENDERING VIDEO")
+    print("="*60)
+    print(f"Resolution: {cfg.video.width}x{cfg.video.height} @ {cfg.video.fps}fps")
+    print(f"Background: {cfg.video.background_color}")
+    final_mp4 = render_video(cfg.video, voice_path=voice_path, srt_path=srt_path, out_dir=day_dir)
+    print(f"✓ Video rendered: {final_mp4.name}")
 
-  # 6) Checksums + latest
-  print("\n" + "="*60)
-  print("💾 FINALIZING")
-  print("="*60)
-  sha_hash = sha256_file(final_mp4)
-  (day_dir / "final.sha256").write_text(sha_hash, encoding="utf-8")
-  print(f"✓ Checksum: {sha_hash[:16]}...")
+    # 6) Checksums + latest
+    print("\n" + "="*60)
+    print("💾 FINALIZING")
+    print("="*60)
+    sha_hash = sha256_file(final_mp4)
+    (day_dir / "final.sha256").write_text(sha_hash, encoding="utf-8")
+    print(f"✓ Checksum: {sha_hash[:16]}...")
+  else:
+    print("\n" + "="*60)
+    print("⏭️  VIDEO GENERATION DISABLED")
+    print("="*60)
+    print("Skipping TTS, captions, and video rendering")
+    print("Summary and topics saved to JSON files")
 
   if cfg.output.write_latest:
     latest = out_root / "latest"
@@ -187,6 +196,11 @@ def run_once(cfg_path: str) -> Path:
   print("\n" + "="*60)
   print("✅ ALL DONE!")
   print("="*60)
+  
+  if final_mp4:
+    print(f"📹 Video: {final_mp4.name}")
+  else:
+    print("📝 Summary only (video disabled)")
 
   return final_mp4
 
@@ -195,8 +209,11 @@ def main():
   ap.add_argument("--config", default="config.yaml", help="Path to config YAML")
   args = ap.parse_args()
   out = run_once(args.config)
-  print(f"\n📹 FINAL OUTPUT: {out}")
-  print(f"📁 Full path: {out.absolute()}\n")
+  if out:
+    print(f"\n📹 FINAL OUTPUT: {out}")
+    print(f"📁 Full path: {out.absolute()}\n")
+  else:
+    print(f"\n✓ Summary and topics generated (video disabled)\n")
 
 if __name__ == "__main__":
   main()

@@ -44,6 +44,7 @@ tts:
   audio_format: "mp3"
 
 video:
+  enabled: true  # Set to false to skip video generation (faster, only generate summaries and email)
   width: 1080
   height: 1920
   fps: 30
@@ -71,3 +72,14 @@ output:
   root_dir: "./output"
   # also write a stable "latest" symlink/copy
   write_latest: true
+
+scheduler:
+  enabled: false  # Set to true to enable automatic scheduling
+  # Schedule format options:
+  # - "daily" with time "HH:MM" (24-hour format, e.g., "08:00", "14:30")
+  # - "hourly" (runs every hour)
+  # - "interval" with interval_minutes (e.g., 120 for every 2 hours)
+  mode: "daily"  # Options: "daily", "hourly", "interval"
+  time: "08:00"  # Time for daily runs (24-hour format)
+  interval_minutes: 60  # Interval in minutes for "interval" mode
+  run_on_start: false  # If true, run immediately when scheduler starts
