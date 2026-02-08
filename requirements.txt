@@ -1,0 +1,12 @@
+PyYAML>=6.0.1
+requests>=2.32.3
+beautifulsoup4>=4.12.3
+lxml>=5.2.2
+pydantic>=2.7.4
+edge-tts>=6.1.10
+urllib3>=2.0.0
+google-genai>=1.0.0
+
+# Optional: For MoviePy-based video generation (alternative to FFmpeg)
+# moviepy>=1.0.3
+# Requires ImageMagick: https://imagemagick.org/script/download.php

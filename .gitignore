@@ -1,0 +1,69 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Configuration (keep example, ignore actual)
+config.yaml
+!config.example.yaml
+
+# Output files (completely ignored)
+output/
+output/**/*
+*.mp4
+*.mp3
+*.wav
+*.srt
+
+# Logs
+*.log
+
+# Test outputs
+test_output/
+test_output.txt
+analysis_results_*.json
+hot_topics_*.txt
+hot_topics_*.json
+moltbook_page.html
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Temporary files
+*.tmp
+*.bak
+*.cache

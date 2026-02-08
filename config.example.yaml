@@ -1,0 +1,73 @@
+moltbook:
+  # Public "hot" / "trending" page(s). Put 1 or more URLs.
+  hot_urls:
+    - "https://moltbook.com/"
+  # How many candidate posts to fetch before we choose top-3
+  fetch_limit: 20
+  # Request timeout seconds
+  timeout_s: 15
+  # User-Agent to reduce blocking
+  user_agent: "Mozilla/5.0 (compatible; DailyVideoBot/1.0)"
+  # If the site blocks aggressively, set a delay between requests (seconds)
+  polite_delay_s: 1.0
+
+summarizer:
+  # Choose "openai_compatible", "gemini", or "local_dummy"
+  backend: "local_dummy"
+
+  openai_compatible:
+    # Examples:
+    # - OpenAI: https://api.openai.com/v1
+    # - Local (OpenAI-compatible): http://localhost:11434/v1  (if you run a compatible server)
+    base_url: "https://api.openai.com/v1"
+    api_key_env: "OPENAI_API_KEY"
+    model: "gpt-4o-mini"
+    temperature: 0.3
+    max_tokens: 900
+
+  gemini:
+    api_key_env: "GEMINI_API_KEY"
+    model: "gemini-2.5-flash"
+    temperature: 0.3
+    max_tokens: 900
+
+tts:
+  # Choose "edge_tts" (recommended free) or "pyttsx3" (offline) or "none"
+  backend: "edge_tts"
+  edge_tts:
+    voice: "en-US-JennyNeural"
+    rate: "+0%"
+    volume: "+0%"
+  pyttsx3:
+    rate: 170
+  # Output voice format
+  audio_format: "mp3"
+
+video:
+  width: 1080
+  height: 1920
+  fps: 30
+  # Total duration seconds (if captions/voiceover are shorter, we pad with silence)
+  pad_s: 1.0
+
+  # Optional: local background image (jpg/png). If empty, we use solid color.
+  background_image: ""
+  # Solid background color (used when background_image is empty)
+  background_color: "#101214"
+
+  # Caption styling (burned into video)
+  captions:
+    font_size: 52
+    # Use a font installed on your system, or provide a .ttf/.otf path
+    font: ""
+    # Position from bottom in pixels
+    margin_v: 160
+
+  # Optional: background music file (local). If set, we mix it at low volume.
+  background_music: ""
+  background_music_volume: 0.08
+
+output:
+  root_dir: "./output"
+  # also write a stable "latest" symlink/copy
+  write_latest: true
