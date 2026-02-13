@@ -39,6 +39,8 @@ venv.bak/
 # Configuration (keep example, ignore actual)
 config.yaml
 !config.example.yaml
+# Environment file containing secrets
+.env
 
 # Output files (completely ignored)
 output/
@@ -47,6 +49,7 @@ output/**/*
 *.mp3
 *.wav
 *.srt
+output_test/
 
 # Logs
 *.log

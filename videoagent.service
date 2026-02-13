@@ -1,0 +1,13 @@
+[Unit]
+Description=VideoAgent Auto Start
+After=network.target
+
+[Service]
+Type=simple
+User=eric
+WorkingDirectory=/home/eric/projects/VideoAgent
+ExecStart=/bin/bash /home/eric/projects/VideoAgent/start_videoagent.sh
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

@@ -14,6 +14,8 @@ moltbook:
 summarizer:
   # Choose "openai_compatible", "gemini", or "local_dummy"
   backend: "local_dummy"
+  # If true, skip topics that were already summarized previously (by URL)
+  skip_already_summarized: true
 
   openai_compatible:
     # Examples:
@@ -72,6 +74,8 @@ output:
   root_dir: "./output"
   # also write a stable "latest" symlink/copy
   write_latest: true
+  # Keep outputs for this many days; older dated folders will be removed
+  retain_days: 30
 
 scheduler:
   enabled: false  # Set to true to enable automatic scheduling
@@ -83,3 +87,27 @@ scheduler:
   time: "08:00"  # Time for daily runs (24-hour format)
   interval_minutes: 60  # Interval in minutes for "interval" mode
   run_on_start: false  # If true, run immediately when scheduler starts
+
+email:
+  enabled: false
+  to_email: "you@example.com"
+  from_email: "bot@example.com"
+  from_name: "AI Daily Bot"
+  smtp:
+    host: "smtp.example.com"
+    port: 587
+    use_tls: true
+    password_env: "EMAIL_PASSWORD"
+  subject_template: "AI Daily Brief - {date}"
+  include_topics: true
+  include_summary: true
+  include_video_link: false
+  # Send a separate Chinese email translation
+  send_chinese: false
+  chinese_subject_template: "AI 每日简报 - {date}"
+
+telegram:
+  # Enable sending a separate Chinese Telegram message
+  send_chinese: false
+  bot_token_env: "TELEGRAM_BOT_TOKEN"
+  chat_id_env: "TELEGRAM_CHAT_ID"
