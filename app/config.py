@@ -36,6 +36,10 @@ class AITopicSelectionCfg(BaseModel):
   enabled: bool = True
   max_topics_to_select: int = 3
   priority_keywords: List[str] = ["AI", "artificial intelligence", "machine learning", "finance", "financial", "economy"]
+  # When true, perform selection based on headline+url+excerpt first,
+  # and only fetch full article content for the chosen topics.
+  # When false, fetch full article content for all headlines before selecting.
+  selection_before_fetch: bool = True
 
 class SourcesCfg(BaseModel):
   reddit: RedditCfg = Field(default_factory=RedditCfg)
@@ -47,6 +51,13 @@ class SourcesCfg(BaseModel):
   user_agent: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
   polite_delay_s: float = 1.0
   top_n_per_source: int = 3
+  # Fetch robustness options (can also be set via environment variables)
+  fetch_retries: int = 2
+  fetch_backoff_factor: float = 0.5
+  # Optional list of user-agents to rotate (overrides `user_agent` when set)
+  fetch_user_agents: Optional[List[str]] = None
+  # Optional environment variable name that holds an HTTP proxy (e.g. "HTTP_PROXY")
+  proxy_env: Optional[str] = None
   ai_topic_selection: AITopicSelectionCfg = Field(default_factory=AITopicSelectionCfg)
 
 class OpenAICompatibleCfg(BaseModel):
@@ -67,6 +78,13 @@ class GeminiCfg(BaseModel):
   model: str = "gemini-2.5-flash"
   temperature: float = 0.3
   max_tokens: int = 900
+  # If true and the provider supports tools/browsing, allow model-assisted fetching.
+  enable_tools: bool = False
+  # Mode for fetching URL content: 'server' (server fetches), 'hybrid' (model may request URLs to fetch),
+  # 'model' (model fetches itself via provider tools). Default is server-only.
+  tool_fetch_mode: Literal['server', 'hybrid', 'model'] = 'server'
+  # When server fetches content on behalf of model, cap returned chars.
+  tool_max_fetch_chars: int = 5000
 
   def api_key(self) -> str:
     # If the value starts with "AIza" it's likely the actual API key, not env var name
@@ -143,6 +161,9 @@ class EmailCfg(BaseModel):
   subject_template: str = "AI Daily Brief - {date}"
   include_topics: bool = True
   include_summary: bool = True
+  include_hashtags: bool = True
+  include_top_topics: bool = True
+  top_topics_count: int = 4
   include_video_link: bool = False
   # Whether to send a separate Chinese email translation
   send_chinese: bool = True

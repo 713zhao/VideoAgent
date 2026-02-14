@@ -12,6 +12,8 @@ import json
 import urllib3
 import xml.etree.ElementTree as ET
 from datetime import datetime
+import os
+import random
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 @dataclass
@@ -322,20 +324,86 @@ class TwitterFetcher:
 def fetch_article_content(url: str, user_agent: str, timeout: int = 15) -> str:
     """
     Fetch full article content from a URL.
-    Extracts main text content from HTML pages.
+    Extracts main text content from HTML pages. Uses environment-configurable
+    retries, backoff, UA rotation, and optional proxy.
     """
     try:
+        # Fetch configuration can be controlled via environment variables:
+        # VIDEOAGENT_FETCH_RETRIES (int), VIDEOAGENT_FETCH_BACKOFF (float),
+        # VIDEOAGENT_FETCH_USER_AGENTS (comma-separated list), VIDEOAGENT_PROXY (proxy URL)
+        retries = int(os.environ.get('VIDEOAGENT_FETCH_RETRIES', '2'))
+        backoff = float(os.environ.get('VIDEOAGENT_FETCH_BACKOFF', '0.5'))
+        uas_env = os.environ.get('VIDEOAGENT_FETCH_USER_AGENTS', '')
+        ua_list = [u.strip() for u in uas_env.split(',') if u.strip()] if uas_env else None
+        proxy_url = os.environ.get('VIDEOAGENT_PROXY', None)
+
         session = requests.Session()
-        session.headers.update({'User-Agent': user_agent})
-        response = session.get(url, timeout=timeout, verify=False, allow_redirects=True)
-        response.raise_for_status()
-        
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
+        # Decide which User-Agent to use for this request: rotate if a list provided,
+        # otherwise use the provided user_agent argument.
+        if ua_list:
+            chosen_ua = random.choice(ua_list)
+        else:
+            chosen_ua = user_agent or os.environ.get('VIDEOAGENT_USER_AGENT', 'Mozilla/5.0')
+
+        session.headers.update({'User-Agent': chosen_ua})
+        if proxy_url:
+            session.proxies.update({'http': proxy_url, 'https': proxy_url})
+
+        # Attempt requests with retries and exponential backoff. Rotate UA on 403.
+        last_exc = None
+        for attempt in range(1, max(1, retries) + 2):
+            try:
+                response = session.get(url, timeout=timeout, verify=False, allow_redirects=True)
+                response.raise_for_status()
+                # Decode bytes robustly to avoid mojibake for non-utf8 pages
+                raw_bytes = response.content
+                decoded = None
+                try:
+                    decoded = raw_bytes.decode('utf-8')
+                except Exception:
+                    # Try requests' apparent_encoding
+                    enc = response.apparent_encoding or None
+                    if enc:
+                        try:
+                            decoded = raw_bytes.decode(enc)
+                        except Exception:
+                            decoded = None
+                if decoded is None:
+                    try:
+                        # Try latin-1 then re-decode to utf-8
+                        repaired = raw_bytes.decode('latin-1')
+                        decoded = repaired
+                    except Exception:
+                        decoded = raw_bytes.decode('utf-8', errors='replace')
+
+                # Normalize to UTF-8 string
+                decoded = decoded.encode('utf-8', errors='replace').decode('utf-8')
+                soup = BeautifulSoup(decoded, 'html.parser')
+                break
+            except requests.exceptions.HTTPError as he:
+                status = getattr(he.response, 'status_code', None)
+                last_exc = he
+                # If blocked (403), try rotating User-Agent once and retry
+                if status == 403 and ua_list:
+                    session.headers.update({'User-Agent': random.choice(ua_list)})
+                    time.sleep(backoff * (2 ** (attempt - 1)))
+                    continue
+                # For other HTTP errors, decide whether to retry
+                if attempt <= retries:
+                    time.sleep(backoff * (2 ** (attempt - 1)))
+                    continue
+                raise
+            except Exception as e:
+                last_exc = e
+                if attempt <= retries:
+                    time.sleep(backoff * (2 ** (attempt - 1)))
+                    continue
+                raise
+
         # Remove script and style elements
         for script in soup(["script", "style", "nav", "header", "footer", "aside"]):
             script.decompose()
-        
+
         # Try to find main content area
         # Common article containers
         main_content = None
@@ -349,29 +417,35 @@ def fetch_article_content(url: str, user_agent: str, timeout: int = 15) -> str:
             'main',
             '#content'
         ]
-        
+
         for selector in selectors:
             main_content = soup.select_one(selector)
             if main_content:
                 break
-        
+
         # If no specific container found, use body
         if not main_content:
             main_content = soup.find('body')
-        
+
         if main_content:
             # Extract all paragraphs
             paragraphs = main_content.find_all('p')
             text_parts = [p.get_text().strip() for p in paragraphs if p.get_text().strip()]
             full_text = '\n\n'.join(text_parts)
-            
+
             # Limit to reasonable length (first 5000 characters)
             return full_text[:5000] if full_text else ""
-        
+
         return ""
-        
+
     except Exception as e:
+        # Provide diagnostic message; caller will fall back to excerpts/titles
         print(f"    ⚠️ Could not fetch content from {url[:50]}...: {e}")
+        if 'last_exc' in locals() and last_exc is not None:
+            try:
+                print(f"       last error: {repr(last_exc)}")
+            except Exception:
+                pass
         return ""
 
 def fetch_all_sources(sources_cfg: Dict[str, Any]) -> Dict[str, List[Topic]]:

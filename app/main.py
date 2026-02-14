@@ -147,7 +147,18 @@ def run_once(cfg_path: str) -> Path:
     print(f"\n" + "="*60)
     print("🤖 AI SELECTING MOST INTERESTING TOPICS")
     print("="*60)
-    
+    # If configured to fetch full article content prior to selection, do so now.
+    if not cfg.sources.ai_topic_selection.selection_before_fetch:
+      print("ℹ️ Config requests fetching full article content before AI selection — fetching content for all headlines...")
+      user_agent = sources_dict.get('user_agent', 'Mozilla/5.0')
+      timeout = sources_dict.get('timeout_s', 15)
+      for topic in selection_pool:
+        try:
+          content = fetch_article_content(topic.url, user_agent, timeout)
+          topic.content = content
+        except Exception:
+          topic.content = getattr(topic, 'content', '') or ''
+
     selected_indices = select_topics_with_ai(
       cfg.summarizer,
       selection_pool,
@@ -189,15 +200,29 @@ def run_once(cfg_path: str) -> Path:
   print("="*60)
   user_agent = sources_dict.get('user_agent', 'Mozilla/5.0')
   timeout = sources_dict.get('timeout_s', 15)
-  
-  for topic in all_selected_topics:
-    print(f"\n  📥 Fetching content for: {topic.title[:60]}...")
-    content = fetch_article_content(topic.url, user_agent, timeout)
-    topic.content = content
-    if content:
-      print(f"     ✓ Fetched {len(content)} characters of content")
-    else:
-      print(f"     ⚠️  No content extracted (will use title and comments)")
+  # If using Gemini with hybrid/model fetch mode, skip bulk server fetch here and let
+  # the summarizer coordinate fetching (model may request specific URLs).
+  use_gemini_tools = False
+  try:
+    if cfg.summarizer.backend == 'gemini' and cfg.summarizer.gemini.enable_tools and cfg.summarizer.gemini.tool_fetch_mode in ('hybrid', 'model'):
+      use_gemini_tools = True
+  except Exception:
+    use_gemini_tools = False
+
+  if use_gemini_tools:
+    print("ℹ️ Gemini tool-mode enabled; deferring content fetch to summarizer (hybrid/model)")
+    # Ensure topics have empty content fields for now
+    for topic in all_selected_topics:
+      topic.content = getattr(topic, 'content', '') or ''
+  else:
+    for topic in all_selected_topics:
+      print(f"\n  📥 Fetching content for: {topic.title[:60]}...")
+      content = fetch_article_content(topic.url, user_agent, timeout)
+      topic.content = content
+      if content:
+        print(f"     ✓ Fetched {len(content)} characters of content")
+      else:
+        print(f"     ⚠️  No content extracted (will use title and comments)")
 
   topics_json = day_dir / "topics.json"
   topics_json.write_text(
@@ -222,17 +247,9 @@ def run_once(cfg_path: str) -> Path:
   print(f"Using backend: {cfg.summarizer.backend}")
   summary_json = day_dir / "summary.json"
   if bundle is None:
-    bundle = summarize(cfg.summarizer, all_selected_topics)
-
-  # Option 2 workflow: produce English summaries then translate to Chinese
-  chinese_bundle = None
-  if cfg.email.send_chinese or cfg.telegram.send_chinese:
-    try:
-      from .translate import translate_bundle
-      chinese_bundle = translate_bundle(cfg.summarizer, bundle, target_lang="zh")
-      print(f"✓ Translated bundle to Chinese (narration {len(chinese_bundle.get('narration',''))} chars)")
-    except Exception as _e:
-      print(f"⚠️ Chinese translation step failed: {_e}")
+    include_chinese = bool(cfg.email.send_chinese or cfg.telegram.send_chinese)
+    bundle = summarize(cfg.summarizer, all_selected_topics, include_chinese=include_chinese)
+    chinese_bundle = bundle if include_chinese else None
 
   print(f"\n✓ NARRATION SCRIPT ({len(bundle.get('narration', ''))} characters):")
   print("-" * 60)
@@ -275,6 +292,7 @@ def run_once(cfg_path: str) -> Path:
     # Format subject with date
     subject = cfg.email.subject_template.format(date=today)
     
+    report_link = (day_dir / "summary.json").resolve().as_uri()
     email_sent = send_summary_email(
       to_email=cfg.email.to_email,
       from_email=cfg.email.from_email,
@@ -284,7 +302,11 @@ def run_once(cfg_path: str) -> Path:
       topics=topics_for_email,
       summary=bundle,
       include_topics=cfg.email.include_topics,
-      include_summary=cfg.email.include_summary
+      include_summary=cfg.email.include_summary,
+      include_hashtags=cfg.email.include_hashtags,
+      include_top_topics=cfg.email.include_top_topics,
+      top_topics_count=cfg.email.top_topics_count,
+      report_link=report_link
     )
     
     if email_sent:
@@ -296,7 +318,7 @@ def run_once(cfg_path: str) -> Path:
     try:
       # Build a plain-text summary for Telegram
       from .email_sender import build_text_email
-      tg_text = build_text_email(topics_for_email, bundle, include_topics=cfg.email.include_topics, include_summary=cfg.email.include_summary)
+      tg_text = build_text_email(topics_for_email, bundle, include_topics=cfg.email.include_topics, include_summary=cfg.email.include_summary, include_hashtags=cfg.email.include_hashtags, include_top_topics=cfg.email.include_top_topics, top_topics_count=cfg.email.top_topics_count, report_link=report_link)
       # Trim to Telegram message sensible length
       tg_text_short = tg_text.strip()[:3800]
       send_telegram_message(tg_text_short)
@@ -329,7 +351,12 @@ def run_once(cfg_path: str) -> Path:
             topics=topics_ch_for_email,
             summary=chinese_bundle,
             include_topics=cfg.email.include_topics,
-            include_summary=cfg.email.include_summary
+            include_summary=cfg.email.include_summary,
+            include_hashtags=cfg.email.include_hashtags,
+            include_top_topics=cfg.email.include_top_topics,
+            top_topics_count=cfg.email.top_topics_count,
+            report_link=report_link,
+            prefer_chinese=True
           )
           if email_sent:
             print(f"✓ Chinese email sent to {cfg.email.to_email}")
@@ -340,7 +367,7 @@ def run_once(cfg_path: str) -> Path:
       if cfg.telegram.send_chinese:
         try:
           from .email_sender import build_text_email
-          tg_ch_text = build_text_email(topics_for_email, chinese_bundle, include_topics=cfg.email.include_topics, include_summary=cfg.email.include_summary)
+          tg_ch_text = build_text_email(topics_for_email, chinese_bundle, include_topics=cfg.email.include_topics, include_summary=cfg.email.include_summary, include_hashtags=cfg.email.include_hashtags, include_top_topics=cfg.email.include_top_topics, top_topics_count=cfg.email.top_topics_count, report_link=report_link, prefer_chinese=True)
           tg_ch_short = tg_ch_text.strip()[:3800]
           send_telegram_message(tg_ch_short, bot_token_env=cfg.telegram.bot_token_env, chat_id_env=cfg.telegram.chat_id_env)
         except Exception as _e:

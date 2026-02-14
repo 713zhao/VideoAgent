@@ -20,6 +20,11 @@ def send_summary_email(
     summary: Dict[str, Any],
     include_topics: bool = True,
     include_summary: bool = True,
+    include_hashtags: bool = True,
+    include_top_topics: bool = True,
+    top_topics_count: int = 4,
+    report_link: str = "",
+    prefer_chinese: bool = False,
 ) -> bool:
     """
     Send an email with AI summary of hot topics.
@@ -46,8 +51,8 @@ def send_summary_email(
         msg['To'] = to_email
         
         # Build email content
-        html_content = build_html_email(topics, summary, include_topics, include_summary)
-        text_content = build_text_email(topics, summary, include_topics, include_summary)
+        html_content = build_html_email(topics, summary, include_topics, include_summary, include_hashtags, include_top_topics, top_topics_count, report_link, prefer_chinese=prefer_chinese)
+        text_content = build_text_email(topics, summary, include_topics, include_summary, include_hashtags, include_top_topics, top_topics_count, report_link, prefer_chinese=prefer_chinese)
         
         # Attach both plain text and HTML versions
         part1 = MIMEText(text_content, 'plain')
@@ -83,7 +88,7 @@ def send_summary_email(
         print(f"❌ Failed to send email: {e}")
         return False
 
-def build_html_email(topics: List[Dict], summary: Dict, include_topics: bool, include_summary: bool) -> str:
+def build_html_email(topics: List[Dict], summary: Dict, include_topics: bool, include_summary: bool, include_hashtags: bool = True, include_top_topics: bool = True, top_topics_count: int = 4, report_link: str = "", prefer_chinese: bool = False) -> str:
     """Build HTML email content."""
     
     html = f"""
@@ -176,7 +181,8 @@ def build_html_email(topics: List[Dict], summary: Dict, include_topics: bool, in
     
     # Show AI Summary FIRST
     if include_summary and summary:
-        narration = summary.get('narration', '')
+        # Prefer Chinese narration when requested and available
+        narration = summary.get('narration_zh') if prefer_chinese and summary.get('narration_zh') else summary.get('narration', '')
         if narration:
             html += f"""
         <h2>📝 AI Summary</h2>
@@ -184,42 +190,48 @@ def build_html_email(topics: List[Dict], summary: Dict, include_topics: bool, in
 """
         
         hashtags = summary.get('hashtags', [])
-        if hashtags:
+        if include_hashtags and hashtags:
             html += f"""
         <p><strong>Hashtags:</strong> {' '.join(hashtags)}</p>
-"""
-    
-    # Then show Topics List
-    if include_topics and topics:
-        html += f"""
-        <h2>📊 Top {len(topics)} Topics</h2>
-"""
-        for i, topic in enumerate(topics, 1):
-            source = topic.get('source', 'Unknown')
-            title = topic.get('title', 'No title')
-            url = topic.get('url', '#')
-            score = topic.get('score', 0)
-            comments = topic.get('comments_count', 0)
-            excerpt = topic.get('excerpt', '')
-            
+    """
+        elif not include_hashtags and report_link:
             html += f"""
+        <p><strong>Hashtags are omitted in this notification.</strong> <a href="{report_link}">Open full report</a></p>
+    """
+    
+    # Then show Topics List (respect include_top_topics)
+    if include_top_topics and topics:
+        shown = topics[:top_topics_count]
+        if shown:
+            html += f"""
+        <h2>📊 Top {len(shown)} Topics</h2>
+"""
+            for i, topic in enumerate(shown, 1):
+                source = topic.get('source', 'Unknown')
+                title = topic.get('title', 'No title')
+                url = topic.get('url', '#')
+                excerpt = topic.get('excerpt', '')
+                html += f"""
         <div class="topic">
             <div class="topic-title">#{i}: {title}</div>
             <div class="topic-meta">
-                <span class="source">{source}</span> • 
-                ⭐ {score} points • 
-                💬 {comments} comments
+                <span class="source">{source}</span>
             </div>
 """
-            if excerpt:
-                html += f"""
+                if excerpt:
+                    html += f"""
             <p style="margin-top: 10px; font-size: 14px; color: #555;">{excerpt[:200]}...</p>
 """
-            html += f"""
+                html += f"""
             <div style="margin-top: 10px;">
                 <a href="{url}" target="_blank">Read More →</a>
             </div>
         </div>
+"""
+    else:
+        if report_link:
+            html += f"""
+        <p><strong>Top topics omitted.</strong> <a href=\"{report_link}\">Open full report</a></p>
 """
     
     html += """
@@ -233,7 +245,7 @@ def build_html_email(topics: List[Dict], summary: Dict, include_topics: bool, in
 """
     return html
 
-def build_text_email(topics: List[Dict], summary: Dict, include_topics: bool, include_summary: bool) -> str:
+def build_text_email(topics: List[Dict], summary: Dict, include_topics: bool, include_summary: bool, include_hashtags: bool = True, include_top_topics: bool = True, top_topics_count: int = 4, report_link: str = "", prefer_chinese: bool = False) -> str:
     """Build plain text email content."""
     
     text = f"""
@@ -245,36 +257,41 @@ Date: {datetime.now().strftime('%B %d, %Y')}
     
     # Show AI Summary FIRST
     if include_summary and summary:
-        narration = summary.get('narration', '')
+        # Prefer Chinese narration when requested and available
+        narration = summary.get('narration_zh') if prefer_chinese and summary.get('narration_zh') else summary.get('narration', '')
         if narration:
             text += "AI SUMMARY\n"
             text += "="*60 + "\n"
             text += narration + "\n\n"
         
         hashtags = summary.get('hashtags', [])
-        if hashtags:
-            text += f"Hashtags: {' '.join(hashtags)}\n\n"
+        if include_hashtags:
+            if hashtags:
+                text += f"Hashtags: {' '.join(hashtags)}\n\n"
+        else:
+            if report_link:
+                text += f"Hashtags are omitted in this notification. View full report: {report_link}\n\n"
     
     # Then show Topics List
-    if include_topics and topics:
-        text += f"TOP {len(topics)} TOPICS\n"
-        text += "="*60 + "\n\n"
-        
-        for i, topic in enumerate(topics, 1):
-            source = topic.get('source', 'Unknown')
-            title = topic.get('title', 'No title')
-            url = topic.get('url', '#')
-            score = topic.get('score', 0)
-            comments = topic.get('comments_count', 0)
-            excerpt = topic.get('excerpt', '')
-            
-            text += f"#{i}: {title}\n"
-            text += f"Source: {source}\n"
-            text += f"Score: {score} | Comments: {comments}\n"
-            if excerpt:
-                text += f"Excerpt: {excerpt[:150]}...\n"
-            text += f"URL: {url}\n"
-            text += "-"*60 + "\n\n"
+    if include_top_topics and topics:
+        shown = topics[:top_topics_count]
+        if shown:
+            text += f"TOP {len(shown)} TOPICS\n"
+            text += "="*60 + "\n\n"
+            for i, topic in enumerate(shown, 1):
+                source = topic.get('source', 'Unknown')
+                title = topic.get('title', 'No title')
+                url = topic.get('url', '#')
+                excerpt = topic.get('excerpt', '')
+                text += f"#{i}: {title}\n"
+                text += f"Source: {source}\n"
+                if excerpt:
+                    text += f"Excerpt: {excerpt[:150]}...\n"
+                text += f"URL: {url}\n"
+                text += "-"*60 + "\n\n"
+    else:
+        if report_link:
+            text += f"Top topics omitted. Open full report: {report_link}\n\n"
     
     text += "\n" + "="*60 + "\n"
     text += "This email was generated automatically by AI Daily Bot\n"

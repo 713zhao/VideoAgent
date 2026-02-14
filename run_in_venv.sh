@@ -29,6 +29,18 @@ if [ -f venv/bin/activate ]; then
   source venv/bin/activate
 fi
 
+# Debug mode: either pass first arg 'debug' or '--debug', or set DEBUG=1 in env
+DEBUG=0
+if [ "${1:-}" = "debug" ] || [ "${1:-}" = "--debug" ] || [ "${DEBUG:-}" = "1" ]; then
+  DEBUG=1
+fi
+
 export PYTHONUNBUFFERED=1
-# Run the project entrypoint and log output
-python run.py >> /tmp/videoagent_cron.log 2>&1
+if [ "$DEBUG" -eq 1 ]; then
+  echo "🔎 Running in debug mode — printing output to terminal"
+  # Run the project entrypoint and print output to terminal
+  python run.py
+else
+  # Run the project entrypoint and log output
+  python run.py >> /tmp/videoagent_cron.log 2>&1
+fi
