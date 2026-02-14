@@ -1,0 +1,19 @@
+[Unit]
+Description=VideoAgent one-shot runner (CLI)
+After=network.target
+
+[Service]
+# Run once and exit; suitable for scheduled runs (timer/cron)
+Type=oneshot
+# Adjust User to the account that should run the service (e.g. "eric")
+User=eric
+WorkingDirectory=/home/eric/projects/VideoAgent
+# EnvironmentFile can point to a secure file managed by ops (do NOT commit secrets)
+EnvironmentFile=/etc/videoagent.env
+# Use the CLI wrapper which acquires a lock and prints JSON (use project venv Python)
+ExecStart=/home/eric/projects/VideoAgent/venv/bin/python -m agent.agent_cli --config /home/eric/projects/VideoAgent/config.yaml
+# Keep a record that the service ran
+RemainAfterExit=no
+
+[Install]
+WantedBy=multi-user.target

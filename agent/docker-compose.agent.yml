@@ -1,0 +1,16 @@
+version: "3.8"
+services:
+  videoagent:
+    build:
+      context: ..
+      dockerfile: agent/Dockerfile.agent
+    environment:
+      - VIDEOAGENT_API_KEY=${VIDEOAGENT_API_KEY}
+      - VIDEOAGENT_HOST=0.0.0.0
+      - VIDEOAGENT_PORT=8000
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ../output:/app/output
+      - ../config.yaml:/app/config.yaml:ro
+    restart: unless-stopped

@@ -1,0 +1,16 @@
+[Unit]
+Description=Timer to run VideoAgent one-shot service (daily)
+
+[Timer]
+# Run daily at 03:00 system time. Edit `OnCalendar` as needed (examples below).
+OnCalendar=03:00
+# Persist missed runs across reboots
+Persistent=true
+
+# Examples:
+# - hourly: OnCalendar=hourly
+# - every 30 minutes: OnUnitActiveSec=30min
+# - daily at UTC midnight: OnCalendar=*-*-* 00:00:00
+
+[Install]
+WantedBy=timers.target
